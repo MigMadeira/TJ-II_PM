@@ -8,16 +8,15 @@ from simsopt import load
 from simsopt.util.permanent_magnet_helper_functions import *
 
 # Set some parameters
-comm = None
 nphi = 64 # need to set this to 64 for a real run
 ntheta = 64 # same as above
-#dr = 0.02  #dr is used when using cylindrical coordinates
-Nx = 10     #Nx is used when using cartesian coordinates
+dr = 0.02  #dr is used when using cylindrical coordinates
+#Nx = 10     #Nx is used when using cartesian coordinates
 surface_flag = 'vmec'
 #input_name = 'input.100_44_64_0.0_000_000000'
 input_name = 'wout_100_44_64_0.0_000_000000.nc'
 preciseQH_wout_name = 'wout_preciseQH_rescaled_TJ-II_PHIEDGE=0.096.nc'
-coordinate_flag = 'cartesian'  #I am using cartesian as the orientation for the magnets is only implemented in the cartesian case.
+coordinate_flag = 'cylindrical'  #I am using cartesian as the orientation for the magnets is only implemented in the cartesian case.
 
 # Make the output directory
 OUT_DIR = './test_grid/'
@@ -32,7 +31,7 @@ s_eq_current.to_vtk(OUT_DIR + "eq_surface_TJ-II")
 s_eq_preciseQH = SurfaceRZFourier.from_wout(str(TEST_DIR/preciseQH_wout_name), range="half period", nphi=nphi, ntheta=ntheta)
 s_eq_preciseQH.to_vtk(OUT_DIR + "eq_preciseQH_TJ-II")
 
-#setting radius for the circular coils
+
 vmec = Vmec(surface_filename)
 #vmec.run()
 # Number of Fourier modes describing each Cartesian component of each coil:
@@ -89,7 +88,8 @@ s_out.to_vtk(OUT_DIR + "surface_out")
 pm_opt = PermanentMagnetGrid(
     s_eq_preciseQH, rz_inner_surface=s_in, rz_outer_surface=s_out,
     Bn=Bnormal,
-    Nx=Nx,
+    #Nx=Nx,
+    dr=dr,
     coordinate_flag=coordinate_flag,
 )
 
