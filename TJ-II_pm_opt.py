@@ -17,7 +17,7 @@ from simsopt.objectives import SquaredFlux
 # Set some parameters
 nphi = 64 # need to set this to 64 for a real run
 ntheta = 64 # same as above
-dr = 0.02  #dr is used when using cylindrical coordinates
+dr = 0.03  #dr is used when using cylindrical coordinates
 #Nx = 10     #Nx is used when using cartesian coordinates
 surface_flag = 'vmec'
 TJ_II_wout = 'wout_100_44_64_0.0_000_000000.nc'
@@ -69,7 +69,7 @@ bs = BiotSavart(coils_to_opt)
 qphi = 2 * nphi
 quadpoints_phi = np.linspace(0, 1, qphi, endpoint=True)
 quadpoints_theta = np.linspace(0, 1, ntheta, endpoint=True)
-s_plot = SurfaceRZFourier.from_vmec_input(
+s_plot = SurfaceRZFourier.from_wout(
     surface_filename, range="full torus",
     quadpoints_phi=quadpoints_phi, quadpoints_theta=quadpoints_theta
 )
@@ -133,7 +133,7 @@ print('Number of available dipoles = ', pm_opt.ndipoles)
 
 # Set some hyperparameters for the optimization
 kwargs = initialize_default_kwargs('GPMO')
-kwargs['K'] = 50000
+kwargs['K'] = 27000
 kwargs['nhistory'] = 500
 
 # Optimize the permanent magnets greedily
