@@ -1,13 +1,13 @@
 
 from simsopt.geo import CurveXYZFourier, curves_to_vtk
 from simsopt.geo import SurfaceRZFourier
-from simsopt.field import coils_via_file
+from simsopt.field import load_coils_from_makegrid_file
 from simsopt.field.biotsavart import BiotSavart
 import numpy as np
 
-curves = CurveXYZFourier.load_curves_from_file("coils.tj2.in.amperes.1004464",100)
+curves = CurveXYZFourier.load_curves_from_makegrid_file("coils.tj2.in.amperes.1004464",5)
 
-coils = coils_via_file("coils.tj2.in.amperes.1004464",100)
+coils = load_coils_from_makegrid_file("coils.tj2.in.amperes.1004464",5)
 
 
 curves_to_vtk(curves, "TJ2_coils", close=True)

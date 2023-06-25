@@ -25,7 +25,7 @@ preciseQH_wout_name = 'wout_preciseQH_rescaled_TJ-II_PHIEDGE=0.096.nc'
 coordinate_flag = 'cylindrical'  
 
 # Make the output directory
-OUT_DIR = './TJ-II_PM_opt/'
+OUT_DIR = './teste/'
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # Read in the plasma equilibrium file
@@ -75,12 +75,57 @@ s_plot = SurfaceRZFourier.from_wout(
 )
 
 # optimize the currents in the TF coils and set up correct Bnormal
-s, bs = coil_optimization(s_eq_preciseQH, bs, base_curves, curves, OUT_DIR, s_plot) 
-bs.set_points(s.gamma().reshape((-1, 3)))
-Bnormal = np.sum(bs.B().reshape((nphi, ntheta, 3)) * s.unitnormal(), axis=2)
+from scipy.optimize import minimize
+from simsopt.geo import curves_to_vtk
+from simsopt.objectives import SquaredFlux
+
+
+MAXITER = 1000  # number of iterations for minimize
+
+# Define the objective function:
+JF = SquaredFlux(s_eq_preciseQH, bs)
+
+def fun(dofs):
+    """ Function for coil optimization grabbed from stage_two_optimization.py """
+    JF.x = dofs
+    J = JF.J()
+    grad = JF.dJ()
+    BdotN = np.mean(np.abs(np.sum(bs.B().reshape((nphi, ntheta, 3)) * s_eq_preciseQH.unitnormal(), axis=2)))
+    outstr = f"J={J:.1e}, ⟨B·n⟩={BdotN:.1e}"
+    outstr += f", ║∇J║={np.linalg.norm(grad):.1e}"
+    print(outstr)
+    return J, grad
+    
+print("""
+################################################################################
+### Perform a Taylor test ######################################################
+################################################################################
+""")
+f = fun
+dofs = JF.x
+np.random.seed(1)
+h = np.random.uniform(size=dofs.shape)
+J0, dJ0 = f(dofs)
+dJh = sum(dJ0 * h)
+
+for eps in [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]:
+    J1, _ = f(dofs + eps*h)
+    J2, _ = f(dofs - eps*h)
+    print("err", (J1-J2)/(2*eps) - dJh)
+
+print("""
+################################################################################
+### Run the optimisation #######################################################
+################################################################################
+""")
+res = minimize(fun, dofs, jac=True, method='L-BFGS-B', options={'maxiter': MAXITER, 'maxcor': 300}, tol=1e-15)
+curves_to_vtk(curves, OUT_DIR / "curves_opt")
+
+bs.set_points(s_eq_preciseQH.gamma().reshape((-1, 3)))
+Bnormal = np.sum(bs.B().reshape((nphi, ntheta, 3)) * s_eq_preciseQH.unitnormal(), axis=2)
 
 # check after-optimization average on-axis magnetic field strength
-calculate_on_axis_B(bs, s)
+calculate_on_axis_B(bs, s_eq_preciseQH)
 
 #find magnetic axis
 ma = CurveRZFourier(np.linspace(0,1./(2*s_eq_current.nfp),25*10, endpoint=False), 24, nfp=s_eq_current.nfp, stellsym=True)
@@ -108,7 +153,7 @@ ma.zs[:] = -np.array([ 0.23298323722167, 0.000259029950179007, 0.000255861432072
 curves_to_vtk([ma],OUT_DIR + "magnetic_axis")
 
 #create inside surface
-s_in = SurfaceRZFourier(ntor=nphi, mpol=int(ntheta/2), nfp = s_eq_current.nfp) #current TJ-II eq
+s_in = SurfaceRZFourier(ntor=nphi, mpol=ntheta, nfp = s_eq_current.nfp) #current TJ-II eq
 s_in.fit_to_curve(ma, 0.6, flip_theta=True)
 s_in.to_vtk(OUT_DIR + "surface_in")
 
@@ -117,17 +162,11 @@ s_out = SurfaceRZFourier(ntor=nphi, mpol=ntheta, nfp = s_eq_current.nfp) #curren
 s_out.fit_to_curve(ma, 0.8, flip_theta=True)
 s_out.to_vtk(OUT_DIR + "surface_out")
 
-
-#Initialize the permanent magnet class
-pm_opt = PermanentMagnetGrid(
-    s, rz_inner_surface=s_in, rz_outer_surface=s_out,
-    Bn=Bnormal,
-    #Nx=Nx,
-    dr=dr,
-    coordinate_flag=coordinate_flag,
+#initialize the permanent magnet class
+kwargs_geo = {"dr": dr, "dz": dr, "coordinate_flag": "cylindrical"}  
+pm_opt = PermanentMagnetGrid.geo_setup_between_toroidal_surfaces(
+    s_eq_preciseQH, Bnormal, s_in, s_out, **kwargs_geo
 )
-
-pm_opt.geo_setup()
 
 print('Number of available dipoles = ', pm_opt.ndipoles)
 
@@ -157,6 +196,21 @@ plt.savefig(OUT_DIR + 'GPMO_MSE_history.png')
 min_ind = np.argmin(R2_history)
 pm_opt.m = np.ravel(m_history[:, :, min_ind])
 
+print("best result = ", 0.5 * np.sum((pm_opt.A_obj @ pm_opt.m - pm_opt.b_obj) ** 2))
+np.savetxt(OUT_DIR + 'best_result_m=' + str(int(kwargs['K'] / (kwargs['nhistory']) * min_ind )) + '.txt', m_history[:, :, min_ind ].reshape(pm_opt.ndipoles * 3))
+b_dipole = DipoleField(pm_opt.dipole_grid_xyz, m_history[:, :, min_ind ].reshape(pm_opt.ndipoles * 3),
+                       nfp=s.nfp, coordinate_flag=pm_opt.coordinate_flag, m_maxima=pm_opt.m_maxima,)
+b_dipole.set_points(s_plot.gamma().reshape((-1, 3)))
+b_dipole._toVTK(OUT_DIR + "Dipole_Fields_K" + str(int(kwargs['K'] / (kwargs['nhistory']) * min_ind)))
+bs.set_points(s_plot.gamma().reshape((-1, 3)))
+Bnormal = np.sum(bs.B().reshape((qphi, ntheta, 3)) * s_plot.unitnormal(), axis=2)
+Bnormal_dipoles = np.sum(b_dipole.B().reshape((qphi, ntheta, 3)) * s_plot.unitnormal(), axis=-1)
+Bnormal_total = Bnormal + Bnormal_dipoles
+# For plotting Bn on the full torus surface at the end with just the dipole fields
+make_Bnormal_plots(b_dipole, s_plot, OUT_DIR, "only_m_optimized_K" + str(int(kwargs['K'] / (kwargs['nhistory']) * min_ind)))
+pointData = {"B_N": Bnormal_total[:, :, None]}
+s_plot.to_vtk(OUT_DIR + "m_optimized_K" + str(int(kwargs['K'] / (kwargs['nhistory']) * min_ind)), extra_data=pointData)
+
 # Print effective permanent magnet volume
 M_max = 1.465 / (4 * np.pi * 1e-7)
 dipoles = pm_opt.m.reshape(pm_opt.ndipoles, 3)
@@ -168,6 +222,10 @@ if save_plots:
     # Save the MSE history and history of the m vectors
     #np.savetxt(OUT_DIR + 'mhistory_K' + str(kwargs['K']) + '_nphi' + str(nphi) + '_ntheta' + str(ntheta) + '.txt', m_history.reshape(pm_opt.ndipoles * 3, kwargs['nhistory'] + 1)) #this file occupies alot of space ~2gb, use with care
     np.savetxt(OUT_DIR + 'R2history_K' + str(kwargs['K']) + '_nphi' + str(nphi) + '_ntheta' + str(ntheta) + '.txt', R2_history)
+
+    vol_eff = np.sum(np.sqrt(np.sum(m_history ** 2, axis=1)), axis=0) *  2 * s.nfp / M_max
+    np.savetxt(OUT_DIR + 'eff_vol_history_K' + str(kwargs['K']) + '_nphi' + str(nphi) + '_ntheta' + str(ntheta) + '.txt', vol_eff)
+    
     # Plot the SIMSOPT GPMO solution
     bs.set_points(s_plot.gamma().reshape((-1, 3)))
     Bnormal = np.sum(bs.B().reshape((qphi, ntheta, 3)) * s_plot.unitnormal(), axis=2)
@@ -196,7 +254,7 @@ if save_plots:
         s_plot.to_vtk(OUT_DIR + "m_optimized_K" + str(int(kwargs['K'] / kwargs['nhistory'] * k)), extra_data=pointData)
 
     # write solution to FAMUS-type file
-    write_pm_optimizer_to_famus(OUT_DIR, pm_opt)
+    pm_opt.write_to_famus(Path(OUT_DIR))
 
 # Compute metrics with permanent magnet results
 dipoles_m = pm_opt.m.reshape(pm_opt.ndipoles, 3)
