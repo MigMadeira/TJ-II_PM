@@ -56,12 +56,13 @@ vmec = Vmec(filename, mpi=mpi, verbose=False, ntheta=ntheta_VMEC, nphi=nphi_VMEC
 s = vmec.boundary
 
 ### Create coils
-coilfile = "../../TJ-II_coils.json" #I converted the TJ-II input into a json through some functions I have made that allow uploading makegrid files to simsopt
+coilfile = "../../TJ-II_coils_order=5.json" #I converted the TJ-II input into a json through some functions I have made that allow uploading makegrid files to simsopt
 bs = load(coilfile)
 coils = bs.coils
 ncoils = len(coils)
 base_curves = [coils[i].curve for i in range(ncoils)]
-
+curves = base_curves[0:8]
+curves.append(base_curves[-4:-1])
 #exit()
 ### Optimize
 surf = vmec.boundary
