@@ -15,17 +15,6 @@ FTOL_ARRAY  =  1e-13
 ! ---- Boundary toroidal flux ----
 PHIEDGE = 0.096
 
-! ---- Pressure profile specification ----
-PMASS_TYPE = "power_series"
-AM = 0.0 
-PRES_SCALE = 1.0
-
-! ---- Profile specification of iota or current ----
-NCURR = 1
-CURTOR = 0.0
-PCURR_TYPE = "power_series"
-AC = 0.0 
-
 ! ---- Other numerical parameters ----
 DELT = 0.9
 NSTEP = 200
