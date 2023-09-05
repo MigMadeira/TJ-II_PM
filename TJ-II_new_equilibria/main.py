@@ -23,15 +23,15 @@ except ImportError:
     comm = None
     pprint = print
 ######## INPUT PARAMETERS ########
-CS_THRESHOLD = [0.1, 0.1, 0.1, 0.05, 0.03] #0.015 #0.00047
-CS_WEIGHT = 1e40
+CS_THRESHOLD = [0.033,0.033,0.033] #0.015 #0.00047
+CS_WEIGHT = 1e20
 max_nfev = 30
 iota_target = -1.6 
-iota_weight = 5e1
-aspect_target = 10
-aspect_weight = 3e-2
-quasisymmetry_weight = 4e5
-max_modes = [1, 2, 2, 3, 3] # 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 6
+iota_weight = 1e2
+aspect_target = 8
+aspect_weight = 1e0
+quasisymmetry_weight = 4e4
+max_modes = [7,7,7] #[2,2,2,3,3,4] # 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 6
 rel_step = 1e-5
 abs_step = 1e-7
 R0 = 1.5
@@ -39,7 +39,7 @@ R1 = 0.22
 ntheta_VMEC = 91
 nphi_VMEC = 91
 numquadpoints = 151
-ftol=1e-4
+ftol=1e-6 #1e-4
 diff_method = 'centered'
 ######## END INPUT PARAMETERS ########
 
@@ -51,7 +51,11 @@ os.chdir(results_path)
 
 ### Get VMEC surface
 #filename = '../../input.100_44_64_0.0'
-filename = 'input.TJ-II_new_equilibria'
+#filename = 'input.TJ-II_new_equilibria'
+#filename = 'input.TJ-II_less_modes'
+#filename = "input.TJ_II_QH_maxmode3"
+filename = "input.12modesTJ-II"
+
 vmec = Vmec(filename, mpi=mpi, verbose=False, ntheta=ntheta_VMEC, nphi=nphi_VMEC, range_surface='half period')
 s = vmec.boundary
 
@@ -61,8 +65,8 @@ bs = load(coilfile)
 coils = bs.coils
 ncoils = len(coils)
 base_curves = [coils[i].curve for i in range(ncoils)]
-curves = base_curves[0:8]
-curves.append(base_curves[-4:-1])
+curves = base_curves
+#curves.append(base_curves[-4:-1])
 #exit()
 ### Optimize
 surf = vmec.boundary
